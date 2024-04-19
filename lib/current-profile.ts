@@ -1,21 +1,24 @@
-import { google } from "googleapis"
+import { auth, redirectToSignIn } from "@clerk/nextjs"
+import { db } from "./db"
 
 export const currentProfile = async () => {
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  )
-  try {
-    const response = await google
-      .youtube({
-        version: "v3",
-        auth: oauth2Client,
-      })
-      .channels.list({
-        part: ["snippet"],
-        mine: true,
-      })
-      .then((response) => console.log(response.data.items![0].snippet?.title))
-  } catch (e) {}
+  const { userId, user } = auth()
+  console.log(userId)
+  if (!userId) return redirectToSignIn()
+  let profile = await db.profile.findUnique({
+    where: {
+      userId,
+    },
+  })
+  if (!profile) {
+    console.log("making profile")
+    profile = await db.profile.create({
+      data: {
+        userId,
+        email: user?.emailAddresses[0].emailAddress || "",
+        name: user?.firstName + " " + user?.lastName || "",
+        imageUrl: user?.profileImageUrl || "",
+      },
+    })
+  }
 }
